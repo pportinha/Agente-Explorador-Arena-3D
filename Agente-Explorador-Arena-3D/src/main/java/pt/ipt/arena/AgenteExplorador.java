@@ -61,6 +61,21 @@ public class AgenteExplorador {
                     continue;
                 }
 
+                if (temDesafioTerminal(percecao)) {
+                    String desafio = obterDesafioTerminal(percecao);
+
+                    System.out.println("=====================================");
+                    System.out.println(" TERMINAL DE PLASMA DETETADO");
+                    System.out.println("=====================================");
+                    System.out.println("Desafio:");
+                    System.out.println(desafio);
+                    System.out.println("Aqui será chamado o Ollama no próximo passo.");
+                    System.out.println();
+
+                    Thread.sleep(400);
+                    continue;
+                }
+
                 String acao = motorHeuristico.decidirProximaAcao(percecao);
 
                 JsonObject respostaAcao = arenaClient.enviarAcao(roomId, robotId, acao);
@@ -76,5 +91,15 @@ public class AgenteExplorador {
             System.out.println("Erro no agente:");
             e.printStackTrace();
         }
+    }
+
+    private static boolean temDesafioTerminal(JsonObject percecao) {
+        return percecao.has("terminal_desafio")
+                && !percecao.get("terminal_desafio").isJsonNull()
+                && !percecao.get("terminal_desafio").getAsString().isBlank();
+    }
+
+    private static String obterDesafioTerminal(JsonObject percecao) {
+        return percecao.get("terminal_desafio").getAsString();
     }
 }
