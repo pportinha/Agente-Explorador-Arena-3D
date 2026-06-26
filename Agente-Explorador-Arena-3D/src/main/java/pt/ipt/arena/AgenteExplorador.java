@@ -27,8 +27,12 @@ public class AgenteExplorador {
 
     private static void iniciarAgente(String servidor, String roomId, String robotId, boolean modoHeuristicaPura) {
         ArenaClient arenaClient = new ArenaClient(servidor);
+        MotorHeuristico motorHeuristico = new MotorHeuristico();
 
         try {
+            System.out.println("=====================================");
+            System.out.println("      AGENTE EXPLORADOR INICIADO");
+            System.out.println("=====================================");
             System.out.println("Servidor: " + servidor);
             System.out.println("Sala: " + roomId);
             System.out.println("Robô: " + robotId);
@@ -50,6 +54,14 @@ public class AgenteExplorador {
                     System.out.println("Jogo terminado.");
                     break;
                 }
+
+                String acao = motorHeuristico.decidirProximaAcao(percecao);
+
+                JsonObject respostaAcao = arenaClient.enviarAcao(roomId, robotId, acao);
+
+                System.out.println("Ação escolhida: " + acao);
+                System.out.println("Resposta da ação:");
+                System.out.println(respostaAcao);
 
                 Thread.sleep(400);
             }
