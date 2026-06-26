@@ -55,6 +55,12 @@ public class AgenteExplorador {
                     break;
                 }
 
+                if (percecao.has("game_started") && !percecao.get("game_started").getAsBoolean()) {
+                    System.out.println("A aguardar início da operação...");
+                    Thread.sleep(400);
+                    continue;
+                }
+
                 String acao = motorHeuristico.decidirProximaAcao(percecao);
 
                 JsonObject respostaAcao = arenaClient.enviarAcao(roomId, robotId, acao);
