@@ -97,7 +97,6 @@ public class ArenaClient {
 
         return response.body();
     }
-
     private JsonObject getJson(String url) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -110,7 +109,7 @@ public class ArenaClient {
 
         verificarResposta(response);
 
-        return gson.fromJson(response.body(), JsonObject.class);
+        return parseJson(response.body());
     }
 
     private JsonObject postJson(String url, JsonObject body) throws IOException, InterruptedException {
@@ -126,9 +125,27 @@ public class ArenaClient {
 
         verificarResposta(response);
 
-        return gson.fromJson(response.body(), JsonObject.class);
+        return parseJson(response.body());
     }
 
+    /**
+     * Converte o corpo da resposta em JsonObject de forma segura.
+     * O servidor pode responder com corpo vazio ou "null" (ex.: alguns /unlock),
+     * casos em que devolvemos um objeto vazio em vez de rebentar.
+     */
+    private JsonObject parseJson(String corpo) {
+        if (corpo == null || corpo.isBlank()) {
+            return new JsonObject();
+        }
+
+        com.google.gson.JsonElement elemento = com.google.gson.JsonParser.parseString(corpo);
+
+        if (elemento == null || elemento.isJsonNull() || !elemento.isJsonObject()) {
+            return new JsonObject();
+        }
+
+        return elemento.getAsJsonObject();
+    }
     private void verificarResposta(HttpResponse<String> response) throws IOException {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IOException("Erro HTTP " + response.statusCode() + ": " + response.body());
