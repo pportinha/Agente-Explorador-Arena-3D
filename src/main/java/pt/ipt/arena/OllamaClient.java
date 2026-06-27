@@ -10,7 +10,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 public class OllamaClient {
-
     private final String baseUrl;
     private final HttpClient httpClient;
     private final Gson gson;
