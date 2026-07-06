@@ -86,8 +86,6 @@ public class PainelMapaCalor extends JPanel {
                 new Color(44, 156, 111), "E");
         desenharConjunto(g2, cofres, origemX, origemY, minX, minY, tamanhoCelula,
                 new Color(111, 89, 176), "C");
-        desenharConjunto(g2, inimigos, origemX, origemY, minX, minY, tamanhoCelula,
-                new Color(194, 54, 54), "I");
 
         for (Map.Entry<String, Integer> entrada : visitas.entrySet()) {
             int[] coord = descodificar(entrada.getKey());
@@ -103,6 +101,10 @@ public class PainelMapaCalor extends JPanel {
             g2.setFont(getFont().deriveFont(Font.BOLD, 11f));
             g2.drawString(String.valueOf(valor), px + 8, py + 17);
         }
+
+        desenharZonasPerigo(g2, origemX, origemY, minX, minY, tamanhoCelula);
+        desenharConjunto(g2, inimigos, origemX, origemY, minX, minY, tamanhoCelula,
+                new Color(194, 54, 54), "I");
 
         if (posicaoAtual != null) {
             int[] coord = descodificar(posicaoAtual);
@@ -134,6 +136,25 @@ public class PainelMapaCalor extends JPanel {
                 g2.setColor(Color.WHITE);
                 g2.setFont(getFont().deriveFont(Font.BOLD, 11f));
                 g2.drawString(etiqueta, px + 8, py + 17);
+            }
+        }
+    }
+
+    private void desenharZonasPerigo(Graphics2D g2, int origemX, int origemY,
+                                     int minX, int minY, int tamanhoCelula) {
+        Color perigo = new Color(194, 54, 54, 58);
+        for (String chave : inimigos) {
+            int[] coord = descodificar(chave);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    if (Math.abs(dx) + Math.abs(dy) > 1) {
+                        continue;
+                    }
+                    int px = origemX + (coord[0] + dx - minX) * tamanhoCelula;
+                    int py = origemY + (coord[1] + dy - minY) * tamanhoCelula;
+                    g2.setColor(perigo);
+                    g2.fillRect(px, py, tamanhoCelula, tamanhoCelula);
+                }
             }
         }
     }

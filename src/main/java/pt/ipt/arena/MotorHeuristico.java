@@ -32,7 +32,9 @@ public class MotorHeuristico {
     private static final int MEMORIA_POSICOES_RECENTES = 8;
     private static final int RAIO_EXPLORACAO = 10;
     private static final int RAIO_COMBATE = 5;
-    private static final int VANTAGEM_ATAQUE = 25;
+    private static final int RAIO_PERIGO = 4;
+    private static final int VANTAGEM_ATAQUE = 20;
+    private static final int ENERGIA_MINIMA_ATAQUE = 90;
 
     private final Random random = new Random();
     private final Map<String, Integer> historicoVisitas = new HashMap<>();
@@ -100,6 +102,11 @@ public class MotorHeuristico {
             return fuga;
         }
 
+        String ataqueImediato = tentarAtacarInimigo(percecao, x, y, energia, 2);
+        if (ataqueImediato != null) {
+            return ataqueImediato;
+        }
+
         if (energia <= ENERGIA_CRITICA) {
             String passoRecurso = passoDiretoParaAlvo(percecao, x, y, "recursos_no_mundo");
             if (passoRecurso != null) {
@@ -112,7 +119,7 @@ public class MotorHeuristico {
             return passoCofre;
         }
 
-        String ataque = tentarAtacarInimigo(percecao, x, y, energia);
+        String ataque = tentarAtacarInimigo(percecao, x, y, energia, RAIO_COMBATE);
         if (ataque != null) {
             return ataque;
         }
@@ -530,30 +537,25 @@ public class MotorHeuristico {
         boolean ameacaForte = energia < energiaInimigo + 15;
         boolean energiaBaixa = energia < ENERGIA_CONFORTAVEL && energia <= energiaInimigo;
 
-        if (distancia <= 3 && (ameacaForte || energiaBaixa)) {
+        if (distancia <= RAIO_PERIGO && (ameacaForte || energiaBaixa)) {
             return escolherMelhorFuga(x, y, inimigos, acoesPossiveis);
         }
         return null;
     }
 
-    private String tentarAtacarInimigo(JsonObject percecao, int x, int y, int energia) {
+    private String tentarAtacarInimigo(JsonObject percecao, int x, int y, int energia, int raio) {
         List<JsonObject> inimigos = inimigosVisiveis(percecao);
-        JsonObject inimigo = inimigoMaisProximo(inimigos, x, y);
+        JsonObject inimigo = melhorInimigoParaAtacar(inimigos, x, y, energia, raio);
         if (inimigo == null) {
             return null;
         }
 
         int ix = arredondar(inimigo, "x");
         int iy = arredondar(inimigo, "y");
-        int energiaInimigo = inimigo.has("energia") ? inimigo.get("energia").getAsInt() : 0;
-        int distancia = Math.abs(ix - x) + Math.abs(iy - y);
 
-        if (distancia <= RAIO_COMBATE && energia >= energiaInimigo + VANTAGEM_ATAQUE) {
-            List<int[]> alvos = new ArrayList<>();
-            alvos.add(new int[]{ix, iy});
-            return primeiroPassoDireto(x, y, alvos);
-        }
-        return null;
+        List<int[]> alvos = new ArrayList<>();
+        alvos.add(new int[]{ix, iy});
+        return primeiroPassoDireto(x, y, alvos);
     }
 
     private List<JsonObject> inimigosVisiveis(JsonObject percecao) {
@@ -588,6 +590,36 @@ public class MotorHeuristico {
         return melhor;
     }
 
+    private JsonObject melhorInimigoParaAtacar(List<JsonObject> inimigos, int x, int y,
+                                               int energia, int raio) {
+        if (energia < ENERGIA_MINIMA_ATAQUE) {
+            return null;
+        }
+
+        JsonObject melhor = null;
+        int melhorPontuacao = Integer.MIN_VALUE;
+
+        for (JsonObject inimigo : inimigos) {
+            int ix = arredondar(inimigo, "x");
+            int iy = arredondar(inimigo, "y");
+            int energiaInimigo = inimigo.has("energia") ? inimigo.get("energia").getAsInt() : 0;
+            int distancia = Math.abs(ix - x) + Math.abs(iy - y);
+            int vantagem = energia - energiaInimigo;
+
+            if (distancia > raio || vantagem < VANTAGEM_ATAQUE) {
+                continue;
+            }
+
+            int pontuacao = vantagem * 3 - distancia * 12 - energiaInimigo;
+            if (pontuacao > melhorPontuacao) {
+                melhorPontuacao = pontuacao;
+                melhor = inimigo;
+            }
+        }
+
+        return melhor;
+    }
+
     private String escolherMelhorFuga(int x, int y, List<JsonObject> inimigos,
                                       List<String> acoesPossiveis) {
         String melhorAcao = null;
@@ -605,6 +637,11 @@ public class MotorHeuristico {
                 int energiaInimigo = inimigo.has("energia") ? inimigo.get("energia").getAsInt() : 100;
                 menorDistancia = Math.min(menorDistancia, distancia);
                 maiorPerigo = Math.max(maiorPerigo, Math.max(0, energiaInimigo - distancia * 10));
+                if (distancia == 0) {
+                    maiorPerigo += 1000;
+                } else if (distancia == 1) {
+                    maiorPerigo += 120;
+                }
             }
 
             int pontuacao = menorDistancia * 20 - maiorPerigo - custoCasa(destino[0], destino[1]);
