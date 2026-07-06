@@ -35,6 +35,7 @@ public class MotorHeuristico {
     private static final int RAIO_PERIGO = 4;
     private static final int VANTAGEM_ATAQUE = 20;
     private static final int ENERGIA_MINIMA_ATAQUE = 90;
+    private static final int PENALIZACAO_PING_PONG = 60;
 
     private final Random random = new Random();
     private final Map<String, Integer> historicoVisitas = new HashMap<>();
@@ -131,10 +132,10 @@ public class MotorHeuristico {
 
         String exploracao = passoParaFronteiraFria(x, y);
         if (exploracao != null && acoesPossiveis.contains(exploracao)) {
-            return exploracao;
+            return aplicarAntiOscilacao(x, y, exploracao, acoesPossiveis);
         }
 
-        return escolherCasaMenosVisitada(x, y, acoesPossiveis);
+        return aplicarAntiOscilacao(x, y, escolherCasaMenosVisitada(x, y, acoesPossiveis), acoesPossiveis);
     }
 
     private String passoDiretoParaAlvo(JsonObject percecao, int x, int y, String nomeArray) {
@@ -426,6 +427,9 @@ public class MotorHeuristico {
             if (acao.equals("MOVER_ESTE") || acao.equals("MOVER_OESTE")) {
                 pontuacao -= 2;
             }
+            if (estaEmPingPong() && voltaParaCasaAnterior(x, y, acao)) {
+                pontuacao += PENALIZACAO_PING_PONG;
+            }
             if (pontuacao < melhorPontuacao) {
                 melhorPontuacao = pontuacao;
                 melhorAcao = acao;
@@ -436,6 +440,64 @@ public class MotorHeuristico {
             return acoesPossiveis.get(random.nextInt(acoesPossiveis.size()));
         }
         return melhorAcao;
+    }
+
+    private String aplicarAntiOscilacao(int x, int y, String acaoEscolhida, List<String> acoesPossiveis) {
+        if (!estaEmPingPong() || !voltaParaCasaAnterior(x, y, acaoEscolhida)) {
+            return acaoEscolhida;
+        }
+
+        String alternativa = null;
+        int melhorPontuacao = Integer.MAX_VALUE;
+
+        for (String acao : acoesPossiveis) {
+            if (voltaParaCasaAnterior(x, y, acao)) {
+                continue;
+            }
+            int[] destino = calcularDestino(x, y, acao);
+            int pontuacao = custoCasa(destino[0], destino[1])
+                    - contarVizinhosDesconhecidos(destino[0], destino[1]) * 6;
+            if (pontuacao < melhorPontuacao) {
+                melhorPontuacao = pontuacao;
+                alternativa = acao;
+            }
+        }
+
+        return alternativa != null ? alternativa : acaoEscolhida;
+    }
+
+    private boolean estaEmPingPong() {
+        if (posicoesRecentes.size() < 4) {
+            return false;
+        }
+
+        List<String> ultimas = new ArrayList<>(posicoesRecentes);
+        int n = ultimas.size();
+        String a = ultimas.get(n - 4);
+        String b = ultimas.get(n - 3);
+        String c = ultimas.get(n - 2);
+        String d = ultimas.get(n - 1);
+
+        return a.equals(c) && b.equals(d) && !a.equals(b);
+    }
+
+    private boolean voltaParaCasaAnterior(int x, int y, String acao) {
+        String anterior = casaAnterior();
+        if (anterior == null) {
+            return false;
+        }
+
+        int[] destino = calcularDestino(x, y, acao);
+        return anterior.equals(chaveCoordenada(destino[0], destino[1]));
+    }
+
+    private String casaAnterior() {
+        if (posicoesRecentes.size() < 2) {
+            return null;
+        }
+
+        List<String> ultimas = new ArrayList<>(posicoesRecentes);
+        return ultimas.get(ultimas.size() - 2);
     }
 
     private int custoCasa(int x, int y) {
