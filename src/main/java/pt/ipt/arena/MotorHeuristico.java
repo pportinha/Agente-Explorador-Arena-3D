@@ -1,6 +1,7 @@
 package pt.ipt.arena;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import javax.swing.SwingUtilities;
@@ -132,6 +133,11 @@ public class MotorHeuristico {
         String passoRecurso = passoDiretoParaRecurso(x, y, percecao);
         if (passoRecurso != null) {
             return passoRecurso;
+        }
+
+        String exploracaoLocal = escolherExploracaoLocal(x, y, acoesPossiveis);
+        if (exploracaoLocal != null) {
+            return aplicarAntiOscilacao(x, y, exploracaoLocal, acoesPossiveis);
         }
 
         String exploracao = passoParaFronteiraFria(x, y);
@@ -282,8 +288,20 @@ public class MotorHeuristico {
 
             String chaveAtual = chaveCoordenada(cx, cy);
             if (!chaveAtual.equals(chaveInicio)) {
-                int pontuacao = custoCasa(cx, cy) + distancia;
-                pontuacao -= contarVizinhosDesconhecidos(cx, cy) * 8;
+                int desconhecidos = contarVizinhosDesconhecidos(cx, cy);
+                boolean aindaNaoVista = !celulasVistas.contains(chaveAtual);
+                if (!aindaNaoVista && desconhecidos == 0) {
+                    continue;
+                }
+
+                int pontuacao = distancia * 12 + custoCasa(cx, cy);
+                pontuacao -= desconhecidos * 18;
+                if (aindaNaoVista) {
+                    pontuacao -= 40;
+                }
+                if (historicoVisitas.containsKey(chaveAtual) && desconhecidos > 0) {
+                    pontuacao += 20;
+                }
                 if (cx == inicioX) {
                     pontuacao += 6;
                 }
@@ -489,6 +507,37 @@ public class MotorHeuristico {
         return melhorAcao;
     }
 
+    private String escolherExploracaoLocal(int x, int y, List<String> acoesPossiveis) {
+        String melhorAcao = null;
+        int melhorPontuacao = Integer.MAX_VALUE;
+
+        for (String acao : acoesPossiveis) {
+            int[] destino = calcularDestino(x, y, acao);
+            String chaveDestino = chaveCoordenada(destino[0], destino[1]);
+            boolean aindaNaoVista = !celulasVistas.contains(chaveDestino);
+
+            if (!aindaNaoVista) {
+                continue;
+            }
+
+            int pontuacao = custoCasa(destino[0], destino[1])
+                    - contarVizinhosDesconhecidos(destino[0], destino[1]) * 10;
+            if (aindaNaoVista) {
+                pontuacao -= 30;
+            }
+            if (estaEmPingPong() && voltaParaCasaAnterior(x, y, acao)) {
+                pontuacao += PENALIZACAO_PING_PONG;
+            }
+
+            if (pontuacao < melhorPontuacao) {
+                melhorPontuacao = pontuacao;
+                melhorAcao = acao;
+            }
+        }
+
+        return melhorAcao;
+    }
+
     private String aplicarAntiOscilacao(int x, int y, String acaoEscolhida, List<String> acoesPossiveis) {
         if (!estaEmPingPong() || !voltaParaCasaAnterior(x, y, acaoEscolhida)) {
             return acaoEscolhida;
@@ -669,18 +718,37 @@ public class MotorHeuristico {
 
     private List<JsonObject> inimigosVisiveis(JsonObject percecao) {
         List<JsonObject> inimigos = new ArrayList<>();
-        if (!percecao.has("outros_robots") || !percecao.get("outros_robots").isJsonArray()) {
+        if (!percecao.has("outros_robots") || percecao.get("outros_robots").isJsonNull()) {
             return inimigos;
         }
 
-        JsonArray arr = percecao.getAsJsonArray("outros_robots");
-        for (int i = 0; i < arr.size(); i++) {
-            JsonObject inimigo = arr.get(i).getAsJsonObject();
-            if (inimigo.has("x") && inimigo.has("y")) {
-                inimigos.add(inimigo);
+        JsonElement elemento = percecao.get("outros_robots");
+        if (elemento.isJsonArray()) {
+            JsonArray arr = elemento.getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                adicionarInimigoSeValido(inimigos, arr.get(i));
+            }
+        } else if (elemento.isJsonObject()) {
+            JsonObject obj = elemento.getAsJsonObject();
+            if (obj.has("x") && obj.has("y")) {
+                adicionarInimigoSeValido(inimigos, obj);
+            } else {
+                for (Map.Entry<String, JsonElement> entrada : obj.entrySet()) {
+                    adicionarInimigoSeValido(inimigos, entrada.getValue());
+                }
             }
         }
         return inimigos;
+    }
+
+    private void adicionarInimigoSeValido(List<JsonObject> inimigos, JsonElement elemento) {
+        if (elemento == null || !elemento.isJsonObject()) {
+            return;
+        }
+        JsonObject inimigo = elemento.getAsJsonObject();
+        if (inimigo.has("x") && inimigo.has("y")) {
+            inimigos.add(inimigo);
+        }
     }
 
     private JsonObject inimigoMaisProximo(List<JsonObject> inimigos, int x, int y) {
