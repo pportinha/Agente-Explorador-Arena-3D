@@ -29,11 +29,47 @@ public class AgenteExplorador {
     }
 
     private static void iniciarAgente(String servidor, String roomId, String robotId, boolean modoHeuristicaPura) {
+        PainelMapaCalor painelMapaCalor = criarJanelaMapaCalor();
         ArenaClient arenaClient = new ArenaClient(servidor);
-        MotorHeuristico motorHeuristico = new MotorHeuristico();
+        MotorHeuristico motorHeuristico = new MotorHeuristico(painelMapaCalor);
         OllamaClient ollamaClient = new OllamaClient(OLLAMA_URL);
         MotorRAG motorRAG = new MotorRAG(ollamaClient);
 
+        Thread agenteThread = new Thread(() -> executarCicloAgente(
+                arenaClient,
+                motorHeuristico,
+                motorRAG,
+                servidor,
+                roomId,
+                robotId,
+                modoHeuristicaPura
+        ), "agente-explorador-loop");
+        agenteThread.start();
+    }
+
+    private static PainelMapaCalor criarJanelaMapaCalor() {
+        PainelMapaCalor painel = new PainelMapaCalor();
+        painel.setPreferredSize(new java.awt.Dimension(760, 620));
+
+        JFrame frame = new JFrame("Telemetria - Mapa de Calor");
+        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        frame.add(new JScrollPane(painel));
+        frame.pack();
+        frame.setLocationByPlatform(true);
+        frame.setVisible(true);
+
+        return painel;
+    }
+
+    private static void executarCicloAgente(
+            ArenaClient arenaClient,
+            MotorHeuristico motorHeuristico,
+            MotorRAG motorRAG,
+            String servidor,
+            String roomId,
+            String robotId,
+            boolean modoHeuristicaPura
+    ) {
         try {
             System.out.println("=====================================");
             System.out.println("      AGENTE EXPLORADOR INICIADO");
@@ -184,6 +220,7 @@ public class AgenteExplorador {
 
         if (foiSucesso(respostaUnlock)) {
             System.out.println(">>> COFRE ABERTO! Chave: " + resultado.codigo() + " (+100 HP)");
+            motorHeuristico.marcarCofreResolvido(x, y);
             // Reflexo tático: dar um passo para libertar o terminal.
             String saida = motorHeuristico.decidirProximaAcao(percecao);
             arenaClient.enviarAcao(roomId, robotId, saida);
