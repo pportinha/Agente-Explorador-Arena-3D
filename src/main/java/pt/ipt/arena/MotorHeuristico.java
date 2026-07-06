@@ -30,6 +30,7 @@ public class MotorHeuristico {
     private static final int ENERGIA_CRITICA = 65;
     private static final int ENERGIA_CONFORTAVEL = 150;
     private static final int MEMORIA_POSICOES_RECENTES = 8;
+    private static final double RAIO_VISAO = 4.5;
     private static final int RAIO_EXPLORACAO = 10;
     private static final int RAIO_COMBATE = 5;
     private static final int RAIO_PERIGO = 4;
@@ -42,6 +43,7 @@ public class MotorHeuristico {
     private final Set<String> cofresFalhados = new HashSet<>();
     private final Set<String> cofresResolvidos = new HashSet<>();
     private final Set<String> paredesConhecidas = new HashSet<>();
+    private final Set<String> celulasVistas = new HashSet<>();
     private final Set<String> cofresConhecidos = new HashSet<>();
     private final Set<String> recursosConhecidos = new HashSet<>();
     private final Set<String> inimigosVisiveisMapa = new HashSet<>();
@@ -81,7 +83,9 @@ public class MotorHeuristico {
         int energia = estado.has("energia") ? estado.get("energia").getAsInt() : 200;
 
         memorizarParedes(percecao);
+        memorizarZonaVisivel(x, y);
         memorizarAlvos(percecao);
+        recursosConhecidos.remove(chaveCoordenada(x, y));
         memorizarInimigos(percecao);
         registarVisita(x, y);
         registarPosicaoRecente(x, y);
@@ -109,7 +113,7 @@ public class MotorHeuristico {
         }
 
         if (energia <= ENERGIA_CRITICA) {
-            String passoRecurso = passoDiretoParaAlvo(percecao, x, y, "recursos_no_mundo");
+            String passoRecurso = passoDiretoParaRecurso(x, y, percecao);
             if (passoRecurso != null) {
                 return passoRecurso;
             }
@@ -125,7 +129,7 @@ public class MotorHeuristico {
             return ataque;
         }
 
-        String passoRecurso = passoDiretoParaAlvo(percecao, x, y, "recursos_no_mundo");
+        String passoRecurso = passoDiretoParaRecurso(x, y, percecao);
         if (passoRecurso != null) {
             return passoRecurso;
         }
@@ -152,6 +156,18 @@ public class MotorHeuristico {
             if (cofresFalhados.contains(chave) || cofresResolvidos.contains(chave)) {
                 continue;
             }
+            int[] coord = descodificarChave(chave);
+            alvos.add(coord);
+        }
+        if (alvos.isEmpty()) {
+            return null;
+        }
+        return primeiroPassoDireto(x, y, alvos);
+    }
+
+    private String passoDiretoParaRecurso(int x, int y, JsonObject percecao) {
+        List<int[]> alvos = obterAlvos(percecao, "recursos_no_mundo");
+        for (String chave : recursosConhecidos) {
             int[] coord = descodificarChave(chave);
             alvos.add(coord);
         }
@@ -340,6 +356,36 @@ public class MotorHeuristico {
         }
     }
 
+    private void memorizarZonaVisivel(int x, int y) {
+        int limite = (int) Math.ceil(RAIO_VISAO);
+        for (int dx = -limite; dx <= limite; dx++) {
+            for (int dy = -limite; dy <= limite; dy++) {
+                int nx = x + dx;
+                int ny = y + dy;
+                double distancia = Math.sqrt(dx * dx + dy * dy);
+                if (distancia <= RAIO_VISAO && temLinhaVisao(x, y, nx, ny)) {
+                    celulasVistas.add(chaveCoordenada(nx, ny));
+                }
+            }
+        }
+    }
+
+    private boolean temLinhaVisao(int x0, int y0, int x1, int y1) {
+        int passos = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+        if (passos == 0) {
+            return true;
+        }
+
+        for (int i = 1; i < passos; i++) {
+            int x = (int) Math.round(x0 + (x1 - x0) * (i / (double) passos));
+            int y = (int) Math.round(y0 + (y1 - y0) * (i / (double) passos));
+            if (temParede(x, y)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void memorizarAlvos(JsonObject percecao) {
         memorizarCoordenadas(percecao, "cofres_no_mundo", cofresConhecidos);
         memorizarCoordenadas(percecao, "recursos_no_mundo", recursosConhecidos);
@@ -407,6 +453,7 @@ public class MotorHeuristico {
 
         SwingUtilities.invokeLater(() -> painelMapaCalor.atualizarMapa(
                 new HashMap<>(historicoVisitas),
+                new HashSet<>(celulasVistas),
                 new HashSet<>(paredesConhecidas),
                 new HashSet<>(cofresConhecidos),
                 new HashSet<>(recursosConhecidos),

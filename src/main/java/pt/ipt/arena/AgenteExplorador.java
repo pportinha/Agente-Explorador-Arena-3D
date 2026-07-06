@@ -104,7 +104,15 @@ public class AgenteExplorador {
             }
 
             while (true) {
-                JsonObject percecao = arenaClient.perceber(roomId, robotId);
+                JsonObject percecao;
+                try {
+                    percecao = arenaClient.perceber(roomId, robotId);
+                } catch (Exception e) {
+                    System.out.println("Falha temporaria na percecao. A recuperar sem encerrar...");
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                    continue;
+                }
 
                 System.out.println("Perceção:");
                 System.out.println(percecao);
@@ -137,11 +145,29 @@ public class AgenteExplorador {
 
                 String acao = motorHeuristico.decidirProximaAcao(percecao);
 
-                JsonObject respostaAcao = arenaClient.enviarAcao(roomId, robotId, acao);
+                JsonObject respostaAcao;
+                try {
+                    respostaAcao = arenaClient.enviarAcao(roomId, robotId, acao);
+                } catch (Exception e) {
+                    System.out.println("Falha temporaria ao enviar acao. A tentar no proximo ciclo...");
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                    continue;
+                }
 
                 System.out.println("Ação escolhida: " + acao);
                 System.out.println("Resposta da ação:");
                 System.out.println(respostaAcao);
+
+                if (estaEliminadoOuTerminou(respostaAcao)) {
+                    System.out.println("Agente eliminado ou jogo terminado segundo a resposta da acao.");
+                    break;
+                }
+                if (estaBloqueado(respostaAcao)) {
+                    System.out.println("Acao bloqueada/castigo detetado. A aguardar para evitar anti-flood...");
+                    Thread.sleep(1200);
+                    continue;
+                }
 
                 Thread.sleep(400);
             }
@@ -199,7 +225,8 @@ public class AgenteExplorador {
 
         ResultadoRAG resultado = motorRAG.resolverDesafio(desafio);
 
-        if (resultado == null || resultado.codigo().isBlank()) {
+        if (resultado == null || resultado.codigo().isBlank()
+                || "DESCONHECIDO".equalsIgnoreCase(resultado.codigo())) {
             System.out.println("RAG não produziu chave. A marcar cofre como falhado.");
             motorHeuristico.marcarCofreFalhado(x, y);
             String fuga = motorHeuristico.decidirProximaAcao(percecao);
@@ -248,6 +275,24 @@ public class AgenteExplorador {
             return false;
         }
         return "sucesso".equalsIgnoreCase(respostaUnlock.get("status").getAsString());
+    }
+
+    private static boolean estaBloqueado(JsonObject resposta) {
+        return contemTexto(resposta, "bloqueado")
+                || contemTexto(resposta, "blocked")
+                || contemTexto(resposta, "anti-flood")
+                || contemTexto(resposta, "tarpit");
+    }
+
+    private static boolean estaEliminadoOuTerminou(JsonObject resposta) {
+        return contemTexto(resposta, "eliminado")
+                || contemTexto(resposta, "eliminated")
+                || contemTexto(resposta, "game_over")
+                || contemTexto(resposta, "rip");
+    }
+
+    private static boolean contemTexto(JsonObject objeto, String texto) {
+        return objeto != null && objeto.toString().toLowerCase().contains(texto.toLowerCase());
     }
 
     private static boolean temDesafioTerminal(JsonObject percecao) {

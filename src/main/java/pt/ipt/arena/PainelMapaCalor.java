@@ -11,6 +11,7 @@ import java.util.Set;
 public class PainelMapaCalor extends JPanel {
 
     private final Map<String, Integer> visitas = new HashMap<>();
+    private final Set<String> vistas = new HashSet<>();
     private final Set<String> paredes = new HashSet<>();
     private final Set<String> cofres = new HashSet<>();
     private final Set<String> recursos = new HashSet<>();
@@ -25,6 +26,7 @@ public class PainelMapaCalor extends JPanel {
     }
 
     public void atualizarMapa(Map<String, Integer> novasVisitas,
+                              Set<String> novasVistas,
                               Set<String> novasParedes,
                               Set<String> novosCofres,
                               Set<String> novosRecursos,
@@ -33,6 +35,9 @@ public class PainelMapaCalor extends JPanel {
                               int atualY) {
         visitas.clear();
         visitas.putAll(novasVisitas);
+
+        vistas.clear();
+        vistas.addAll(novasVistas);
 
         paredes.clear();
         paredes.addAll(novasParedes);
@@ -80,6 +85,8 @@ public class PainelMapaCalor extends JPanel {
         int minX = limites.x;
         int minY = limites.y;
 
+        desenharConjunto(g2, vistas, origemX, origemY, minX, minY, tamanhoCelula,
+                new Color(225, 232, 240), null);
         desenharConjunto(g2, paredes, origemX, origemY, minX, minY, tamanhoCelula,
                 new Color(57, 62, 70), null);
         desenharConjunto(g2, recursos, origemX, origemY, minX, minY, tamanhoCelula,
@@ -162,6 +169,7 @@ public class PainelMapaCalor extends JPanel {
     private Rectangle calcularLimites() {
         Set<String> todas = new HashSet<>();
         todas.addAll(visitas.keySet());
+        todas.addAll(vistas);
         todas.addAll(paredes);
         todas.addAll(cofres);
         todas.addAll(recursos);
