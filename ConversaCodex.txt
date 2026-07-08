@@ -1,0 +1,1096 @@
+# Melhorar mapa e motor
+
+> vou te enviar o enunciado, estamos a fazer um robô mas ele tá meio burro ainda, conseguimos melhorar tudo? por exemplo mapa de calor e o motor?
+>
+> User context
+>
+> Attachments:
+> - enunciado_projeto_programacao_III_v.1.0 (1).docx: `~/Downloads/enunciado_projeto_programacao_III_v.1.0 (1).docx`
+
+<details><summary>30 previous messages</summary>
+
+> Vou primeiro ler o enunciado e a estrutura do projeto para perceber quais são as regras esperadas do robô e onde vale a pena mexer. Depois avanço para melhorias concretas no mapa de calor, motor/decisão e verifico que continua a correr.
+>
+> <details><summary>Ran 3 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'C:\Users\celia\.codex\plugins\cache\openai-primary-runtime\documents\26.630.12135\skills\documents\SKILL.md'`
+> - Ran `rg --files`
+> - Ran `git status --short`
+>
+> </details>
+>
+> O skill de documentos está carregado; como o ficheiro está fora da pasta do projeto, a leitura direta pode precisar de permissão do ambiente. Vou continuar pelo código local e, se for preciso, peço acesso só para extrair o texto do enunciado.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `rg --files`
+> - Ran `git status --short`
+>
+> </details>
+>
+> Já vi que é um projeto Java/Maven pequeno, com classes separadas para heurística, RAG, cliente da arena e painel de mapa de calor. O `git status` não pôde correr por “dubious ownership”, por isso não vou mexer na configuração global do Git sem necessidade.
+>
+> <details><summary>Ran 8 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\AgenteExplorador.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'pom.xml'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\JanelaConfiguracao.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\ArenaClient.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorRAG.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\OllamaClient.java'`
+>
+> </details>
+>
+> Estou a ver duas coisas fortes para melhorar: o painel de mapa de calor existe mas ainda não está ligado ao ciclo do agente, e o motor decide por BFS simples sem penalizar casas “quentes”, sem gerir limites conhecidos e sem anti-loop robusto. Vou extrair o texto do enunciado agora para alinhar as melhorias com o que é pedido.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran ``Add-Type -AssemblyName System.IO.Compression.FileSystem; $doc='C:\Users\celia\Downloads\enunciado_projeto_programacao_III_v.1.0 (1).docx'; $zip=[System.IO.Compression.ZipFile]::OpenRead($doc); $entry=$zip.GetEntry('word/document.xml'); $reader=New-Object System.IO.StreamReader($entry.Open()); $xml=$reader.ReadToEnd(); $reader.Close(); $zip.Dispose(); $text=($xml -replace '<w:tab/>',' ' -replace '</w:p>','`n' -replace '<[^>]+>',''); [System.Net.WebUtility]::HtmlDecode($text)``
+>
+> </details>
+>
+> O enunciado confirma exatamente as peças que faltavam: mapa de calor visual, memória heurística para evitar loops, atração por cofres/recursos, lista negra e tolerância a falhas. Vou mexer sobretudo em `MotorHeuristico`, ligar o `PainelMapaCalor` ao agente, e deixar a visualização útil em vez de só desenhar números.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/PainelMapaCalor.java` (+167 -40)
+>
+> </details>
+>
+> O painel já passa a mostrar paredes, cofres, energia, posição atual e intensidade real das visitas. Agora vou reforçar o motor: menos ida-e-volta, exploração por “fronteira fria”, rotas com custo de calor e uma pequena fila de reflexos táticos.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+276 -98)
+>
+> </details>
+>
+> O patch grande bateu na codificação estranha dos acentos do ficheiro, então vou fazer a alteração de forma mais controlada. A lógica é a mesma; só vou aplicar em blocos menores para não destruir nada à volta.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java' -TotalCount 45`
+>
+> </details>
+>
+> Vou substituir o `MotorHeuristico.java` por uma versão limpa em ASCII. Isto também elimina os caracteres corrompidos nos comentários e reduz o risco de problemas de encoding no IntelliJ/Maven.
+>
+> <details><summary>Created a file, deleted a file</summary>
+>
+> - Deleted `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+0 -368)
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+598 -0)
+>
+> </details>
+>
+> O motor já foi trocado por uma versão mais esperta: usa custo de calor nos caminhos, penaliza posições recentes e procura fronteiras novas quando não vê objetivos. Agora vou ligar isto à janela Swing sem bloquear a interface.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+57 -21)
+>
+> </details>
+>
+> A interface já fica viva: o loop pesado do agente passa para uma thread própria, e o painel de mapa de calor abre como dashboard de telemetria. Vou compilar agora para apanhar erros de Java antes de te entregar isto.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `mvn test`
+>
+> </details>
+>
+> O Maven não está no PATH neste ambiente, então não consegui usar `mvn test` diretamente. Vou fazer uma verificação alternativa com `javac` se o JDK estiver disponível, puxando a dependência Gson do cache local se existir.
+>
+> <details><summary>Ran 3 commands</summary>
+>
+> - Ran `java -version`
+> - Ran `Get-ChildItem -Path $env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1 -Filter gson-2.10.1.jar -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName`
+> - Ran `javac -version`
+>
+> </details>
+>
+> Temos JDK e a jar do Gson no cache local, portanto dá para fazer uma compilação direta. Vou compilar para uma pasta temporária do projeto e corrigir qualquer erro que apareça.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> A compilação direta encontrou uma limitação de permissões ao fechar a jar do Gson no `.m2`, mesmo tendo encontrado o ficheiro. Vou repetir com permissão fora da sandbox para validar a compilação corretamente.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> A compilação passou. Vou limpar só a pasta temporária de classes que criei (`.codex-build`), para o projeto não ficar com artefactos nossos espalhados.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+>
+> Já está limpo. Vou só fazer uma última leitura rápida dos pontos alterados para garantir que as peças ficaram ligadas nos sítios certos antes de fechar.
+>
+> <details><summary>Ran 3 commands</summary>
+>
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\AgenteExplorador.java' -Pattern 'criarJanelaMapaCalor|executarCicloAgente|MotorHeuristico|Thread agenteThread'`
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\MotorHeuristico.java' -Pattern 'passoParaFronteiraFria|custoCasa|filaAcoesPlaneadas|primeiroPassoBuscaCalor|atualizarPainel'`
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\PainelMapaCalor.java' -Pattern 'atualizarMapa|desenharConjunto|calcularLimites|posicaoAtual'`
+>
+> </details>
+</details>
+
+Consegui melhorar o robô alinhado com o enunciado.
+
+Mexi em três pontos principais:
+
+- [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java): agora usa mapa de calor real no custo das rotas, penaliza posições recentes para evitar loops, procura “fronteiras frias” quando não vê cofres/energia, mantém memória de cofres/recursos/paredes e tem uma pequena fila de ações reflexas para fuga.
+- [PainelMapaCalor.java](./src/main/java/pt/ipt/arena/PainelMapaCalor.java): deixou de ser só números; agora mostra calor, paredes, cofres, energia e posição atual do robô.
+- [AgenteExplorador.java](./src/main/java/pt/ipt/arena/AgenteExplorador.java): liga o painel ao motor e corre o ciclo do agente numa thread própria, para a janela Swing não ficar bloqueada.
+
+Validação: compilei com `javac` e passou sem erros. O `mvn test` não correu porque o Maven não está no PATH deste ambiente. Também não consegui usar `git status` porque o repositório está marcado pelo Git como “dubious ownership”, então não alterei configuração global sem te perguntar.
+
+> ok tá tudo a funcionar mas, eu quero um foco nos baus, energia e que que de acordo com o mapa vá diretamente aos baus sem andar a dar voltas, e melhora o combate também
+
+<details><summary>16 previous messages</summary>
+
+> Perfeito, agora vou afinar a prioridade tática: cofres primeiro, energia quando fizer sentido para não morrer, e combate com decisões menos “míopes”. Vou mexer no motor para escolher alvos por utilidade real e planear caminhos mais diretos, sem deixar o mapa de calor desviar o robô quando já existe um baú alcançável.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\AgenteExplorador.java' -TotalCount 180`
+>
+> </details>
+>
+> A leitura confirma o problema: quando há baú, o caminho ainda passa pelo custo do mapa de calor, então às vezes “prefere” voltas bonitas em vez de ir ao objetivo. Vou separar as duas coisas: mapa de calor só para exploração; baús/energia/combate usam rota direta por distância e paredes conhecidas.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+39 -25)
+>
+> </details>
+>
+> Já separei a navegação direta dos objetivos: baús e energia deixam de ser influenciados pelo calor, que fica reservado para exploração. Agora vou reforçar combate para fugir melhor quando está em desvantagem e perseguir inimigos fracos com rota curta quando temos energia.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+52 -58)
+>
+> </details>
+>
+> O combate agora passa a avaliar todos os inimigos visíveis: fugir escolhe a casa que aumenta melhor a distância e reduz perigo, atacar só acontece com vantagem clara e rota direta. Vou completar a ordenação dos passos em direção ao alvo e compilar.
+>
+> <details><summary>Edited a file, ran a command</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+15 -2)
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> A compilação passou. Encontrei mais um detalhe importante para o foco em baús: como agora o motor memoriza cofres conhecidos, convém remover um cofre da memória quando ele abre, senão o robô pode voltar ao baú já resolvido. Vou ajustar isso também.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+11 -2)
+>
+> </details>
+>
+> O motor já distingue cofres falhados de cofres resolvidos, para não perseguir fantasmas no mapa. Vou ligar essa marcação no momento em que o `/unlock` dá sucesso.
+>
+> <details><summary>Edited 2 files, ran a command</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+6 -5)
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\AgenteExplorador.java' -Pattern 'COFRE ABERTO' -Context 2,4`
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+6 -5)
+>
+> </details>
+>
+> Boa, agora o baú aberto sai da memória de alvos. Vou recompilar uma última vez e limpar a pasta temporária.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou remover o diretório temporário de build que usei só para validação.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Feito. O robô agora tem prioridade bem mais clara:
+
+- Vai diretamente aos baús por rota curta, sem o mapa de calor o fazer dar voltas.
+- Usa energia como prioridade só quando está em nível crítico.
+- Memoriza baús vistos e continua a persegui-los mesmo se saírem do radar.
+- Remove baús já abertos da memória, para não voltar a eles.
+- Combate melhor: foge de inimigos fortes escolhendo a casa mais segura, e só ataca quando tem vantagem energética clara.
+- O mapa de calor fica para exploração quando não há baús/energia/inimigos relevantes.
+
+Alterei principalmente [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java) e também liguei a marcação de baú resolvido em [AgenteExplorador.java](./src/main/java/pt/ipt/arena/AgenteExplorador.java).
+
+Validação: compilei com `javac` e passou sem erros.
+
+> no mapa de calor não deteta os inimigos e ele tá a fazer muitas verticais, gostava que ele explora se novas zonas
+
+<details><summary>10 previous messages</summary>
+
+> Boa chamada. Vou ajustar duas frentes: desenhar inimigos no painel, e mudar a exploração para preferir fronteiras ainda não vistas com menos tendência para ficar em colunas verticais.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+>
+> </details>
+>
+> Encontrei a causa mais provável das verticais: em empates, as direções estavam por ordem Norte/Sul antes de Este/Oeste, e a fronteira fria dava pouco prémio a abrir zonas novas. Vou pôr Este/Oeste à frente nos empates e dar mais peso a células com mais vizinhos desconhecidos.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/PainelMapaCalor.java` (+9 -1)
+>
+> </details>
+>
+> O painel já tem camada de inimigos (`I`) em vermelho. Agora vou alimentar essa camada a partir da perceção e mexer na exploração para abrir mais mapa em vez de subir/descer tanto.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+26 -6)
+>
+> </details>
+>
+> Já está a passar inimigos para o painel e a exploração ganhou um viés real para abrir células novas, com pequeno prémio horizontal em empates. Vou compilar para apanhar qualquer assinatura quebrada.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou só limpar a pasta temporária de classes da validação.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Feito. Agora o mapa de calor mostra inimigos como `I` em vermelho, além de robô, cofres, energia e paredes.
+
+Também ajustei a exploração para ele tentar abrir zonas novas com mais vontade:
+
+- células com mais vizinhos desconhecidos ficam mais atrativas;
+- movimentos Este/Oeste ganham prioridade em empates, para reduzir aquela mania de ficar só em verticais;
+- se estiver a explorar sem baús/energia visíveis, evita escolher fronteiras alinhadas na mesma coluna sempre que há alternativa melhor.
+
+Alterei [PainelMapaCalor.java](./src/main/java/pt/ipt/arena/PainelMapaCalor.java) e [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java). Compilei com `javac` e passou sem erros.
+
+> ok boa, não mexas em nada, diz me que commit dou para isto
+
+Podes fazer um commit assim:
+
+```bash
+git add src/main/java/pt/ipt/arena/AgenteExplorador.java src/main/java/pt/ipt/arena/MotorHeuristico.java src/main/java/pt/ipt/arena/PainelMapaCalor.java
+git commit -m "Melhora navegacao, mapa de calor e combate do agente"
+```
+
+Mensagem alternativa mais detalhada:
+
+```bash
+git commit -m "Prioriza baus e melhora exploracao com mapa de calor"
+```
+
+> ok tá agora tão bom, mas o que acho que podemos melhorar, ver os agentes inimigos no mapa, e melhorar a questão do combate
+
+<details><summary>10 previous messages</summary>
+
+> Sim, dá para puxar isto mais um nível. O mapa já tem suporte para inimigos, mas vou tornar isso mais explícito/útil e reforçar o combate com “ameaça”, “caça” e “zona de perigo”, em vez de só olhar para o inimigo mais próximo.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+>
+> </details>
+>
+> O painel já recebia inimigos, mas eles podiam ficar visualmente tapados pelo calor porque eram desenhados antes das visitas. Vou pô-los por cima do heatmap com uma pequena zona de perigo, e no motor vou fazer o ataque escolher o inimigo mais vantajoso em vez de atacar só o mais próximo.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/PainelMapaCalor.java` (+23 -2)
+>
+> </details>
+>
+> Agora os inimigos aparecem sempre por cima do calor e com uma cruz vermelha suave à volta para mostrar casas perigosas. Vou mexer no combate: escolher alvo fraco, fugir antes de ficar colado, e não deixar baús roubarem prioridade quando há oportunidade clara de ataque.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+50 -13)
+>
+> </details>
+>
+> O combate ficou mais seletivo: ataca primeiro se houver alvo fraco perto, escolhe o inimigo com melhor vantagem, e a fuga evita mesmo entrar em cima/ao lado de inimigo forte. Vou compilar para garantir que ficou tudo certo.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou bem. Vou limpar a pasta temporária de build e depois deixo-te o resumo certinho.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Feito. Melhorias aplicadas:
+
+- No mapa, os inimigos agora ficam desenhados por cima do heatmap, como `I` vermelho.
+- Também aparece uma zona de perigo vermelha suave nas casas adjacentes ao inimigo.
+- No combate, o robô agora ataca primeiro se houver inimigo fraco muito perto.
+- A escolha de ataque já não é só “mais próximo”: escolhe o alvo com melhor vantagem energética.
+- A fuga ficou mais defensiva: evita ir para cima de inimigos ou ficar adjacente a inimigo forte.
+
+Ficheiros alterados: [PainelMapaCalor.java](./src/main/java/pt/ipt/arena/PainelMapaCalor.java) e [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java).
+
+Compilei com `javac` e passou sem erros.
+
+> dá o commit para isto nem mexeres em nada!
+
+Claro. Para estas últimas melhorias, usa:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java src/main/java/pt/ipt/arena/PainelMapaCalor.java
+git commit -m "Melhora visualizacao de inimigos e logica de combate"
+```
+
+Também podes usar uma mensagem mais curta:
+
+```bash
+git commit -m "Melhora combate e inimigos no mapa"
+```
+
+> ele  ficou bugado em 2 casas, conseguimos impedir com isso aconteca?
+
+<details><summary>8 previous messages</summary>
+
+> Sim, isso é clássico de oscilação: ele fica preso num “vai e volta” entre duas coordenadas porque ambas parecem aceitáveis localmente. Vou pôr uma trava anti-ping-pong no motor, penalizando voltar para a casa imediatamente anterior e forçando uma alternativa quando deteta padrão A-B-A-B.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+>
+> </details>
+>
+> Vou aplicar uma trava anti-oscilação sem mexer no resto da arquitetura: detetar padrão A-B-A-B, evitar regressar à casa anterior quando houver alternativa, e dar uma penalização forte a esse retorno na escolha local.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+64 -2)
+>
+> </details>
+>
+> A trava já está aplicada no caminho de exploração e na escolha local, que é onde normalmente nasce o vai-e-volta. Vou compilar para garantir que não ficou nada partido.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar a pasta temporária de build.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Sim, meti uma trava anti “2 casas”.
+
+Agora o motor deteta padrão tipo `A -> B -> A -> B` e, quando isso acontece, evita voltar logo para a casa anterior se existir outra saída possível. Também penaliza fortemente esse retorno na escolha local, preferindo uma casa com vizinhos desconhecidos.
+
+Alterado em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java). Compilei com `javac` e passou sem erros.
+
+> comit
+
+Usa este:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java
+git commit -m "Evita oscilacao entre duas casas"
+```
+
+> ok, agora temos uns pontos que ainda tão incompletos, por exemplo, o raio de visão é 4.5 unidades de distância e nós estamos com menos, vou te mandar o enunciado e tu das um check daquilo que ainda não esta certo!
+>
+> User context
+>
+> Attachments:
+> - enunciado_projeto_programacao_III_v.1.0 (1).docx: `~/Downloads/enunciado_projeto_programacao_III_v.1.0 (1).docx`
+
+<details><summary>8 previous messages</summary>
+
+> Vou fazer uma revisão contra o enunciado, sem mexer no código: primeiro confirmo os requisitos principais do DOCX e depois cruzo com as classes atuais. Vou usar o skill de documentos só para tratar o enunciado como fonte, e depois faço uma checklist objetiva do que está certo, incompleto ou suspeito.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'C:\Users\celia\.codex\plugins\cache\openai-primary-runtime\documents\26.630.12135\skills\documents\SKILL.md'`
+> - Ran `rg --files`
+>
+> </details>
+>
+> Tenho os ficheiros do projeto mapeados. Agora vou extrair o texto do enunciado e ler as classes principais para montar a checklist; não vou alterar nada nesta ronda.
+>
+> <details><summary>Ran 3 commands</summary>
+>
+> - Ran ``Add-Type -AssemblyName System.IO.Compression.FileSystem; $doc='C:\Users\celia\Downloads\enunciado_projeto_programacao_III_v.1.0 (1).docx'; $zip=[System.IO.Compression.ZipFile]::OpenRead($doc); $entry=$zip.GetEntry('word/document.xml'); $reader=New-Object System.IO.StreamReader($entry.Open()); $xml=$reader.ReadToEnd(); $reader.Close(); $zip.Dispose(); $text=($xml -replace '<w:tab/>',' ' -replace '</w:p>','`n' -replace '<[^>]+>',''); [System.Net.WebUtility]::HtmlDecode($text)``
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\AgenteExplorador.java'`
+>
+> </details>
+>
+> O ficheiro do enunciado está aberto noutro programa, então a leitura normal falhou. Vou tentar uma leitura “partilhada” sem bloquear o Word; se ainda assim não der, uso o texto do enunciado que já extraímos antes nesta conversa.
+>
+> <details><summary>Ran 4 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\ArenaClient.java'`
+> - Ran ``$doc='C:\Users\celia\Downloads\enunciado_projeto_programacao_III_v.1.0 (1).docx'; $fs=[System.IO.File]::Open($doc,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite); $tmp=Join-Path $env:TEMP 'enunciado_check.docx'; $out=[System.IO.File]::Create($tmp); $fs.CopyTo($out); $out.Close(); $fs.Close(); Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip=[System.IO.Compression.ZipFile]::OpenRead($tmp); $entry=$zip.GetEntry('word/document.xml'); $reader=New-Object System.IO.StreamReader($entry.Open()); $xml=$reader.ReadToEnd(); $reader.Close(); $zip.Dispose(); $text=($xml -replace '<w:tab/>',' ' -replace '</w:p>','`n' -replace '<[^>]+>',''); [System.Net.WebUtility]::HtmlDecode($text)``
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorRAG.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\OllamaClient.java'`
+>
+> </details>
+>
+> Já consegui ler o enunciado mesmo com o ficheiro aberto. Estou a cruzar os requisitos com o código: a parte do raio 4.5 é importante porque o vosso agente hoje confia só no que o servidor devolve, mas não representa explicitamente a zona visível nem a oclusão no raciocínio/mapa.
+>
+> <details><summary>Ran 4 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\DocumentoVetorial.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\JanelaConfiguracao.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\ResultadoRAG.java'`
+>
+> </details>
+</details>
+
+Sim. Fiz o check contra o enunciado e **não mexi em nada**.
+
+**Mais Importante**
+1. **Raio de visão 4.5: incompleto**
+   O enunciado diz que o radar vê até `4.5` unidades. No código não há constante nem lógica explícita para isso. O agente usa apenas o que vem no JSON do servidor, mas o mapa não mostra/usa uma “zona visível” de raio 4.5 nem distingue “não visto” de “visto livre”.
+   Onde mexer depois: [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java), [PainelMapaCalor.java](./src/main/java/pt/ipt/arena/PainelMapaCalor.java)
+
+2. **Oclusão por paredes: incompleto**
+   O enunciado diz que paredes bloqueiam linha de visão. O código memoriza paredes recebidas em `objetos_fixos`, mas não calcula linha de visão nem marca células como “não visíveis por parede”. Isto não quebra o agente, mas falta para estar mesmo fiel ao enunciado.
+
+3. **Resposta “bloqueado” da ação: fraco**
+   O `AgenteExplorador` envia ação e imprime a resposta, mas não reage se o servidor disser `bloqueado`, colisão, castigo anti-flood ou eliminado. O enunciado pede reagir ao feedback no turno seguinte.
+   Onde: [AgenteExplorador.java](./src/main/java/pt/ipt/arena/AgenteExplorador.java)
+
+4. **Tolerância a falhas de rede: incompleta**
+   Há `try-catch` geral, mas se der timeout dentro do `while`, o agente pode sair do ciclo e morrer. O enunciado pede absorver micro-cortes e tentar outra vez.
+   Ideal: `try-catch` dentro de cada iteração, com `Thread.sleep(800/1000)` em erro.
+
+5. **Modo Missão vs Battle Royale: incompleto**
+   O enunciado pede adaptar comportamento conforme o modo. O código tem combate se aparecerem `outros_robots`, mas não lê `tipo_jogo` nem desliga combate explicitamente em Missão. Pode estar OK se o servidor mandar array vazio, mas não está robusto.
+
+**Está Bem**
+- Classes obrigatórias existem: `AgenteExplorador`, `ArenaClient`, `OllamaClient`, `DocumentoVetorial`, `PainelMapaCalor`.
+- Maven + Gson OK.
+- Mapa de calor existe e está ligado.
+- Lista negra de cofres falhados existe.
+- RAG tem embeddings, cosine similarity, ChatML e temperatura `0.0`.
+- `Thread.sleep(400)` cumpre a margem recomendada do enunciado.
+- Combate/fuga já está mais avançado do que o mínimo.
+
+**Melhorias Secundárias**
+- O RAG usa só o melhor chunk. Podia usar top 3 chunks para acertar mais cofres.
+- Se o LLM responder `DESCONHECIDO`, o código ainda pode submeter isso ao `/unlock` e levar penalização.
+- A fila de ações existe, mas é usada sobretudo para fuga; podia ser usada depois de abrir baú.
+- Recursos vistos anteriormente são desenhados, mas a navegação só persegue recursos que estão na perceção atual.
+
+Prioridade que eu faria a seguir: **raio 4.5 + células vistas/não vistas + reação a bloqueado/timeouts**. Isso deixa o agente muito mais fiel ao enunciado e menos “cego” no mapa.
+
+> podes nas alterações que o enunciado pede e podes também fazer a melhoria do Recursos vistos anteriormente são desenhados, mas a navegação só persegue recursos que estão na perceção atual.
+
+<details><summary>26 previous messages</summary>
+
+> Sim. Vou implementar agora as lacunas mais diretamente ligadas ao enunciado: memória de zona vista com raio 4.5 no mapa, perseguir recursos já vistos anteriormente, reação melhor a erros/bloqueios, e um filtro para não submeter `DESCONHECIDO` no RAG. Primeiro vou abrir os pontos exatos para mexer com cuidado.
+>
+> <details><summary>Ran 3 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\AgenteExplorador.java'`
+>
+> </details>
+>
+> Vou fazer isto em três blocos pequenos para ficar seguro: primeiro o motor passa a memorizar células visíveis no raio 4.5 e recursos antigos; depois o painel desenha essas células vistas; por fim o loop fica mais tolerante a respostas/erros e o RAG evita `DESCONHECIDO`.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+73 -25)
+>
+> </details>
+>
+> O primeiro patch apanhou uma diferença pequena na assinatura do painel. Vou aplicar em pedaços menores, mais cirúrgicos.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+2 -0)
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+1 -0)
+>
+> </details>
+>
+> O motor já tem a constante `RAIO_VISAO = 4.5` e vai atualizar a memória de células vistas em cada perceção. Agora vou trocar a navegação de recursos para usar também recursos já vistos.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+2 -2)
+>
+> </details>
+>
+> Agora vou adicionar o método de recurso persistente e a lógica simples de linha de visão: só marca como visto dentro de 4.5 se uma parede conhecida não estiver pelo meio.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+42 -0)
+>
+> </details>
+>
+> Recursos antigos passam a ser alvos de navegação, não só desenho. Vou ligar as células vistas ao painel e desenhá-las como fundo suave.
+>
+> <details><summary>Edited 2 files</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+1 -0)
+> - Wrote `./src/main/java/pt/ipt/arena/PainelMapaCalor.java` (+8 -0)
+>
+> </details>
+>
+> Há um detalhe importante: se o robô chegar a uma energia, ela é recolhida automaticamente; por isso vou remover da memória o recurso na posição atual para ele não tentar voltar ao mesmo ponto depois.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+1 -0)
+>
+> </details>
+>
+> Agora vou tratar a resiliência do ciclo: erros de rede deixam de matar o agente, respostas de ação são analisadas, e `DESCONHECIDO` deixa de ser submetido como chave.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+61 -16)
+>
+> </details>
+>
+> O patch bateu nos acentos corrompidos do ficheiro. Vou aplicar por blocos menores usando as linhas estruturais que não dependem do texto.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\AgenteExplorador.java' -Pattern 'while \(true\)|perceber|enviarAcao|Thread.sleep\(400\)|resultado == null|foiSucesso' -Context 2,3`
+>
+> </details>
+>
+> Vou trocar só o miolo do `while` para ter recuperação por iteração, mantendo a estrutura existente.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+34 -8)
+>
+> </details>
+>
+> O ciclo principal já recupera de timeouts/erros sem fechar. Agora vou acrescentar as funções de deteção de bloqueio/eliminado e o filtro `DESCONHECIDO`.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/AgenteExplorador.java` (+31 -12)
+>
+> </details>
+>
+> As alterações principais estão feitas. Vou compilar agora para apanhar erros de assinatura entre `MotorHeuristico` e `PainelMapaCalor`.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar a pasta temporária de build e faço só uma última verificação textual dos pontos alterados.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\MotorHeuristico.java','src\main\java\pt\ipt\arena\PainelMapaCalor.java','src\main\java\pt\ipt\arena\AgenteExplorador.java' -Pattern 'RAIO_VISAO|celulasVistas|passoDiretoParaRecurso|Falha temporaria|estaBloqueado|DESCONHECIDO|novasVistas'`
+>
+> </details>
+</details>
+
+Feito. Apliquei as melhorias que vinham do enunciado e a dos recursos já vistos.
+
+O que mudou:
+
+- `RAIO_VISAO = 4.5` agora existe no motor.
+- O agente memoriza células vistas dentro desse raio.
+- A memória visual respeita uma linha de visão simples: se houver parede conhecida no caminho, não marca a célula como vista.
+- O mapa de calor passa a desenhar também células já vistas, em fundo claro.
+- Recursos vistos anteriormente agora também são perseguidos pela navegação, não ficam só desenhados no painel.
+- Quando o robô pisa uma célula de recurso, esse recurso sai da memória para não o fazer voltar ao mesmo sítio.
+- O ciclo principal ficou mais resiliente a timeouts/falhas temporárias de rede.
+- Se uma ação vier como bloqueada/anti-flood, o agente espera mais tempo antes de continuar.
+- Se o RAG devolver `DESCONHECIDO`, já não submete isso ao `/unlock`; marca o cofre como falhado e sai.
+
+Ficheiros alterados:
+
+- [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java)
+- [PainelMapaCalor.java](./src/main/java/pt/ipt/arena/PainelMapaCalor.java)
+- [AgenteExplorador.java](./src/main/java/pt/ipt/arena/AgenteExplorador.java)
+
+Compilei com `javac` e passou sem erros.
+
+> commit
+
+Usa este:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java src/main/java/pt/ipt/arena/PainelMapaCalor.java src/main/java/pt/arena/AgenteExplorador.java
+git commit -m "Alinha percecao e resiliencia com o enunciado"
+```
+
+Atenção: se o teu terminal disser que o terceiro caminho não existe, usa este caminho correto:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java src/main/java/pt/ipt/arena/PainelMapaCalor.java src/main/java/pt/ipt/arena/AgenteExplorador.java
+git commit -m "Alinha percecao e resiliencia com o enunciado"
+```
+
+> não diz qualquer coisa sem ter haver com o enunciado, fala no codigo
+
+Sim, melhor uma mensagem centrada no código:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java src/main/java/pt/ipt/arena/PainelMapaCalor.java src/main/java/pt/ipt/arena/AgenteExplorador.java
+git commit -m "Melhora percecao, recursos e tolerancia a falhas"
+```
+
+Ou mais curta:
+
+```bash
+git commit -m "Melhora mapa e recuperacao do agente"
+```
+
+> Os pontos negativos é, ele não mete os inimigos no painel de calor, e as vezes ele não explora as coisas ao pé e vai explorar mais longe
+
+<details><summary>8 previous messages</summary>
+
+> Vou atacar os dois sintomas diretamente: primeiro tornar a leitura de inimigos mais tolerante ao formato do JSON, para aparecerem sempre no painel; depois ajustar a exploração para preferir células próximas ainda não vistas antes de escolher fronteiras mais longe.
+>
+> <details><summary>Ran 2 commands</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\PainelMapaCalor.java'`
+>
+> </details>
+>
+> Vejo duas causas prováveis: o parser só aceita `outros_robots` como array, e se o servidor vier com objeto/dicionário os inimigos nunca entram no painel; e a exploração só escolhe “melhor fronteira” numa área grande, então pode saltar oportunidades adjacentes. Vou corrigir essas duas peças.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+63 -6)
+>
+> </details>
+>
+> Já corrigi o parsing de inimigos para aceitar array, objeto único ou dicionário de robôs. Também adicionei uma etapa de exploração local: antes de ir para fronteiras longe, ele tenta casas adjacentes ainda não vistas/visitadas. Vou compilar.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar o build temporário e deixo o resumo.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Feito. Corrigi os dois pontos:
+
+- Os inimigos agora são lidos mesmo que `outros_robots` venha como array, objeto único ou dicionário de robôs. Isso deve resolver o problema de não aparecerem no painel.
+- A exploração agora tenta primeiro casas próximas ainda não vistas/visitadas antes de procurar fronteiras mais longe. Ou seja, ele deve explorar melhor o que está ao pé antes de se afastar.
+
+Alterei só [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java).
+
+Compilei com `javac` e passou sem erros.
+
+> Ele tá a ir a sitios que já conhecia pela distancia do mapa, mas lá na mesma, enquanto tinha novas zonas para explorar
+
+<details><summary>8 previous messages</summary>
+
+> Faz sentido: o robô está a tratar “conhecido mas ainda não visitado” quase como novidade, e ainda por cima recursos conhecidos podem puxá-lo para trás. Vou afinar a prioridade: se houver zona nova à volta, explora isso primeiro; só depois vai a recursos não críticos ou zonas já conhecidas.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\MotorHeuristico.java' -Pattern 'passoRecurso|exploracaoLocal|passoParaFronteiraFria|escolherExploracaoLocal|custoCasa|contarVizinhosDesconhecidos' -Context 3,5`
+>
+> </details>
+>
+> Vou ajustar a ordem de decisão: recursos só ganham antes da exploração se a energia estiver crítica; caso contrário, exploração local e fronteira nova vêm antes dos recursos conhecidos. Também vou fazer a fronteira procurar “não visto” de verdade.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+17 -9)
+>
+> </details>
+>
+> Agora a exploração só considera localmente casas ainda não vistas, e recursos normais ficam depois da exploração. Vou compilar para garantir que está tudo certo.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou. Vou limpar o build temporário.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Corrigido. Agora o robô deve deixar de ir a zonas já conhecidas enquanto houver zonas novas por perto.
+
+O que mudei em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java):
+
+- Exploração local agora só escolhe casas adjacentes ainda não vistas.
+- Fronteira distante agora ignora casas que já são conhecidas e não abrem vizinhos novos.
+- Recursos não críticos passaram para depois da exploração. Ou seja:
+  - energia crítica: vai buscar recurso;
+  - baú: vai ao baú;
+  - zona nova perto: explora;
+  - fronteira nova: explora;
+  - só depois vai a recurso conhecido.
+- Mantive recursos como prioridade quando a energia está baixa, porque aí é sobrevivência.
+
+Compilei com `javac` e passou sem erros.
+
+> ele pode ir sempre a recrusos, a questão é, quando não há recursos e já conhece a zona pelo mapa e não tem nada, e ainda existe zonas para conhecer onde provavelmente vai haver baus, tem de ir a essas zonas
+
+<details><summary>8 previous messages</summary>
+
+> Percebi: recursos continuam válidos sempre, o problema é quando não há recursos/cofres úteis e ele escolhe vaguear por área já conhecida em vez de caminhar até uma fronteira desconhecida. Vou ajustar a exploração para distinguir “casa já vista mas com saída para desconhecido” de “zona morta conhecida”, e deixar recursos novamente antes da exploração.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\MotorHeuristico.java' -Pattern 'passoRecurso|passoParaFronteiraFria|escolherExploracaoLocal|contarVizinhosDesconhecidos|celulasVistas.contains' -Context 3,5`
+>
+> </details>
+>
+> Vou repor os recursos antes da exploração quando não há baú, e reforçar a fronteira como “ir para zona que abre desconhecido”, não como vaguear por casas conhecidas.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+9 -6)
+>
+> </details>
+>
+> Recursos voltaram a ter prioridade quando existem; a exploração só entra quando não há recurso/cofre/alvo útil. Ajustei também a pontuação para preferir fronteiras mais perto e menos revisitadas. Vou compilar.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar o build temporário.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Percebi e ajustei isso.
+
+Agora a lógica fica assim:
+
+1. Se há recurso conhecido/visível, ele pode ir ao recurso.
+2. Se não há recurso nem baú nem combate útil, aí sim ele força exploração.
+3. Na exploração, ele evita zonas já conhecidas “mortas”.
+4. Quando precisa atravessar zona conhecida para chegar a uma fronteira nova, ele faz isso, mas prefere fronteiras mais perto e menos revisitadas.
+5. Penalizei casas já visitadas que só servem de passagem, para ele não ficar a rondar o mesmo mapa conhecido.
+
+Alterado em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java). Compilei com `javac` e passou sem erros.
+
+> ótimo que commit dou disto?
+
+Usa este:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java
+git commit -m "Ajusta prioridade entre recursos e exploracao"
+```
+
+Ou, mais específico:
+
+```bash
+git commit -m "Evita explorar zonas conhecidas sem objetivos"
+```
+
+> o que aconteceu agora foi, tinha lá um bau,ele viu o mas apareceu um inimigo ele fugiu voltou pro bau, que já estava aberto e ficou bugado em 2 casa a andar pra frente e para trás
+>
+> User context
+>
+> Images:
+> - `~/AppData/Local/Temp/codex-clipboard-29875b71-145e-41c8-a975-93711592f446.png`
+
+<details><summary>12 previous messages</summary>
+
+> Vi o padrão: o baú ficou na memória como alvo mesmo depois de deixar de ser útil, e as ações “diretas para alvo” estavam a escapar à trava anti-oscilação. Vou corrigir os dois: remover cofres sem desafio quando o robô pisa neles, filtrar cofres já abertos quando o JSON indicar isso, e aplicar anti-ping-pong também nas rotas para alvos.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java'`
+>
+> </details>
+>
+> Vou limpar a memória dos cofres “mortos” quando o robô pisa neles e não há desafio, e fazer a trava anti-oscilação valer também para movimentos diretos ao baú/recurso, desde que isso não impeça pegar num recurso adjacente real.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+40 -3)
+>
+> </details>
+>
+> Agora, se ele voltar a pisar um cofre sem desafio, o motor marca como resolvido e remove da lista de alvos. Vou adicionar o helper que aplica anti-oscilação aos caminhos diretos, mas preserva pegar objetivo adjacente.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+15 -0)
+>
+> </details>
+>
+> Falta um pequeno filtro: quando o servidor indicar no próprio JSON que um cofre está aberto/resolvido, ele não deve entrar em `cofresConhecidos`. Vou ajustar isso também.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+8 -0)
+>
+> </details>
+>
+> As proteções contra baú aberto/stale já estão no motor. Vou compilar para garantir que ficou consistente.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar o build temporário.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Corrigi exatamente esse caso.
+
+O que estava a acontecer: o baú podia continuar na memória como alvo mesmo depois de aberto, especialmente se o robô fugisse por causa de inimigo e depois voltasse. Como ele ainda “via” aquele alvo, tentava ir para lá e entrava outra vez no padrão de 2 casas.
+
+Agora em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java):
+
+- Se o robô pisa um cofre e ele já não tem `terminal_desafio`, marca esse cofre como resolvido.
+- Se o JSON do cofre tiver sinais tipo `aberto`, `opened`, `desbloqueado`, `unlocked`, `resolvido`, também remove da lista de alvos.
+- Cofres abertos já não entram em `cofresConhecidos`.
+- A trava anti-oscilação agora também pode atuar em caminhos diretos para alvos, não só em exploração.
+- Mas não bloqueia pegar recurso ou ir a objetivo ativo adjacente.
+
+Compilei com `javac` e passou sem erros.
+
+> commit para isso?
+
+Usa este:
+
+```bash
+git add src/main/java/pt/ipt/arena/MotorHeuristico.java
+git commit -m "Evita voltar a cofres ja resolvidos"
+```
+
+Ou mais completo:
+
+```bash
+git commit -m "Corrige memoria de cofres e oscilacao em alvos"
+```
+
+> ele esteve ali as voltas, mesmo com uma nova zona por explorar, porque?
+>
+> User context
+>
+> Images:
+> - `~/AppData/Local/Temp/codex-clipboard-19764a6e-3d05-4855-9606-2ff5dd02d4dc.png`
+
+<details><summary>12 previous messages</summary>
+
+> A razão provável está no nosso critério de “novo”: eu estava a tratar células já vistas pelo radar como conhecidas, mesmo que o robô nunca as tivesse pisado. Na imagem, muitas zonas cinzentas são “vistas mas não visitadas”; para um humano isso é claramente zona por explorar, mas o motor estava a dar menos prioridade a elas. Vou corrigir isso para “explorar” significar principalmente **não visitado**, não apenas “nunca visto”.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `Select-String -Path 'src\main\java\pt\ipt\arena\MotorHeuristico.java' -Pattern 'escolherExploracaoLocal|passoParaFronteiraFria|contarVizinhosDesconhecidos|custoCasa' -Context 2,8`
+>
+> </details>
+>
+> O motor confirma o motivo: “zona nova por explorar” no painel pode estar em cinzento, ou seja, vista pelo radar mas nunca visitada. A regra local estava a aceitar só células ainda não vistas, por isso ignorava cinzentas por visitar. Vou ajustar isso agora.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+36 -28)
+>
+> </details>
+>
+> Vou aplicar em dois blocos, porque as duas zonas do ficheiro estão separadas.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+5 -1)
+>
+> </details>
+>
+> A exploração local agora aceita células nunca visitadas, mesmo que já estejam vistas/cinzentas no painel. Vou fazer o mesmo para a fronteira distante.
+>
+> <details><summary>Edited a file, ran a command</summary>
+>
+> - Ran `Get-Content -LiteralPath 'src\main\java\pt\ipt\arena\MotorHeuristico.java' | Select-Object -Skip 288 -First 30`
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+6 -2)
+>
+> </details>
+>
+> Com isso, as casas cinzentas não visitadas passam a ser consideradas exploração válida. Vou compilar para validar.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar o diretório temporário.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Aconteceu porque o motor distinguia mal duas coisas:
+
+- **visto pelo radar**: aparece cinzento no mapa;
+- **explorado de verdade**: o robô já passou lá.
+
+Na imagem, há zonas cinzentas que ele já “viu”, mas ainda não visitou. O código estava a tratar essas zonas como conhecidas demais e dava prioridade menor a elas, então podia ficar a circular em casas visitadas em vez de entrar nessas áreas cinzentas.
+
+Corrigi em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java):
+
+- exploração local agora aceita casas **nunca visitadas**, mesmo que já estejam vistas no mapa;
+- fronteira distante também valoriza casas vistas mas ainda não visitadas;
+- casas nunca visitadas recebem bónus forte para o robô entrar nelas;
+- zonas já visitadas só são preferidas se realmente abrirem caminho para desconhecido.
+
+Compilei com `javac` e passou sem erros.
+
+> mas é isso mesmo se vires bem na imagem tinha um zona nunca visitada e ele andou as voltas lá em baixo, eu quero que fique assim mesmo dar prioridade aquelas que nunca visitou ,aquelas que viu e não tem nada não vale a pena ir entendes?
+
+<details><summary>6 previous messages</summary>
+
+> Sim, entendi melhor agora: não basta “não visitado”. Se já foi visto pelo radar e não abre nada novo, é só chão vazio conhecido, então não vale gastar passos. O alvo de exploração deve ser: **nunca visto** ou **visto mas ainda não visitado que abre caminho para zona desconhecida**. Vou ajustar esse critério.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+4 -4)
+>
+> </details>
+>
+> Agora casas já vistas e vazias só entram se forem passagem/fronteira para abrir desconhecido; não entram só por ainda não terem sido pisadas. Vou compilar para validar.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar o build temporário.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Sim, entendi. Ajustei para ficar assim:
+
+- **Prioridade alta:** células nunca vistas.
+- **Prioridade boa:** células vistas mas ainda não visitadas **só se abrirem caminho para desconhecido**.
+- **Ignorar:** células vistas, vazias, sem vizinhos desconhecidos, mesmo que o robô nunca tenha pisado lá.
+
+Ou seja, ele deixa de ir só “pintar o mapa cinzento” quando aquilo já não acrescenta nada. Vai procurar zonas que ainda podem revelar baús/recursos.
+
+Alterado em [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java). Compilei com `javac` e passou sem erros.
+
+> Consegues deixar o motorheuristico como tava antes? de celulas, tava muito melhor
+
+<details><summary>6 previous messages</summary>
+
+> Sim, vou voltar só essa parte da lógica das células para o comportamento anterior: células vistas mas ainda não visitadas voltam a contar como exploração válida. Não vou mexer no resto do motor.
+>
+> <details><summary>Edited a file</summary>
+>
+> - Wrote `./src/main/java/pt/ipt/arena/MotorHeuristico.java` (+2 -2)
+>
+> </details>
+>
+> Já repus essa regra. Vou compilar rápido para confirmar que ficou tudo ok.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `New-Item -ItemType Directory -Force -Path .codex-build | Out-Null; javac -encoding UTF-8 -cp "$env:USERPROFILE\.m2\repository\com\google\code\gson\gson\2.10.1\gson-2.10.1.jar" -d .codex-build (Get-ChildItem -Path src\main\java -Recurse -Filter *.java | ForEach-Object { $_.FullName })`
+>
+> </details>
+>
+> Compilou sem erros. Vou limpar a pasta temporária de build.
+>
+> <details><summary>Ran a command</summary>
+>
+> - Ran `$target = Resolve-Path -LiteralPath '.codex-build'; $root = Resolve-Path -LiteralPath '.'; if ($target.Path.StartsWith($root.Path)) { Remove-Item -LiteralPath $target.Path -Recurse -Force } else { throw "Caminho fora do workspace: $target" }`
+>
+> </details>
+</details>
+
+Feito. Reverti só a lógica das células no [MotorHeuristico.java](./src/main/java/pt/ipt/arena/MotorHeuristico.java) para o comportamento anterior:
+
+- células vistas mas ainda não visitadas voltam a contar como boas para exploração;
+- a fronteira também volta a aceitar essas células;
+- mantive o resto das correções do motor.
+
+Compilei com `javac` e passou sem erros.
